@@ -200,7 +200,12 @@ fn main() {
     } else if let Some(m) = matches.subcommand_matches("get") {
         get_host(m.args.get("hostname").unwrap().vals[0].to_str().unwrap());
     } else if let Some(m) = matches.subcommand_matches("set") {
-        set_host(m.args.get("hostname").unwrap().vals[0].to_str().unwrap());
+        let hostnames = get_used_hostnames_from_hosts_file();
+        let hostname = m.args.get("hostname").unwrap().vals[0].to_str().unwrap();
+        set_host(&hostname);
+        if hostnames.contains(&hostname.to_string()) {
+            write_hosts_file(hostnames);
+        }
         show_list();
     } else if let Some(m) = matches.subcommand_matches("use") {
         let mut hostnames = get_used_hostnames_from_hosts_file();
