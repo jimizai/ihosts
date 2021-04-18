@@ -1,11 +1,14 @@
 use clap::{App, Arg, SubCommand};
 use ignore::WalkBuilder;
 use prettytable::{Cell, Row, Table};
-use std::fs::{self, File};
 use std::io::{ErrorKind, Read};
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{
+    borrow::BorrowMut,
+    fs::{self, File},
+};
 
 const WORKSPACE_DIR: &'static str = "/etc/ihosts";
 const VERSION: &'static str = "0.0.1";
@@ -80,6 +83,7 @@ fn read_base_dir() -> Vec<String> {
             Some(s) => s.to_string(),
             None => String::new(),
         })
+        .borrow_mut()
         .collect()
 }
 
@@ -190,6 +194,11 @@ fn main() {
             SubCommand::with_name("set")
                 .arg(Arg::with_name("hostname").takes_value(true).required(true)),
         )
+        .subcommand(
+            SubCommand::with_name("rm")
+                .alias("remove")
+                .arg(Arg::with_name("hostname").takes_value(true).required(true)),
+        )
         .get_matches();
 
     if let Some(_) = matches.subcommand_matches("show") {
@@ -226,6 +235,21 @@ fn main() {
             .filter(|s| s != hostname)
             .collect::<Vec<String>>();
         write_hosts_file(v);
+        show_list();
+    } else if let Some(m) = matches.subcommand_matches("rm") {
+        let hostnames = get_used_hostnames_from_hosts_file();
+        let hostname = m.args.get("hostname").unwrap().vals[0].to_str().unwrap();
+        if hostnames.contains(&hostname.to_string()) {
+            let v = hostnames
+                .into_iter()
+                .filter(|s| s != hostname)
+                .collect::<Vec<String>>();
+            write_hosts_file(v);
+        }
+        match fs::remove_file(transform_path(hostname)) {
+            Ok(_) => {}
+            Err(_) => eprintln!("remove file error"),
+        }
         show_list();
     }
 }
