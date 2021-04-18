@@ -1,5 +1,6 @@
 use clap::{App, Arg, SubCommand};
 use ignore::WalkBuilder;
+use prettytable::{Cell, Row, Table};
 use std::fs::{self, File};
 use std::io::{ErrorKind, Read};
 use std::iter::Iterator;
@@ -60,10 +61,10 @@ fn read_file_bufs(path: &str) -> Vec<u8> {
 fn init_cteate_ihost_dir() {
     match fs::read_dir(WORKSPACE_DIR) {
         Err(why) if why.kind() == ErrorKind::NotFound => match fs::create_dir(WORKSPACE_DIR) {
-            Err(why) => eprintln!("{}", why),
+            Err(why) => eprintln!("init error: {}", why),
             Ok(_) => {}
         },
-        Err(why) => eprintln!("{:?}", why),
+        Err(why) => eprintln!("init error: {}", why),
         Ok(_) => (),
     }
 }
@@ -84,7 +85,17 @@ fn read_base_dir() -> Vec<String> {
 
 fn show_list() {
     let files = read_base_dir();
-    println!("{:?}", files)
+    let mut table = Table::new();
+    table.add_row(Row::new(vec![Cell::new("NAME"), Cell::new("IS_USED")]));
+    let used_hostnames = get_used_hostnames_from_hosts_file();
+
+    for file in files {
+        table.add_row(Row::new(vec![
+            Cell::new(file.as_str()),
+            Cell::new(used_hostnames.contains(&file).to_string().as_str()),
+        ]));
+    }
+    table.printstd();
 }
 
 fn transform_path(file_name: &str) -> PathBuf {
@@ -185,11 +196,12 @@ fn main() {
         let result = read_file(HOST_FILE);
         println!("{}", result);
     } else if let Some(_) = matches.subcommand_matches("list") {
-        show_list()
+        show_list();
     } else if let Some(m) = matches.subcommand_matches("get") {
-        get_host(m.args.get("hostname").unwrap().vals[0].to_str().unwrap())
+        get_host(m.args.get("hostname").unwrap().vals[0].to_str().unwrap());
     } else if let Some(m) = matches.subcommand_matches("set") {
-        set_host(m.args.get("hostname").unwrap().vals[0].to_str().unwrap())
+        set_host(m.args.get("hostname").unwrap().vals[0].to_str().unwrap());
+        show_list();
     } else if let Some(m) = matches.subcommand_matches("use") {
         let mut hostnames = get_used_hostnames_from_hosts_file();
         let hostname = m.args.get("hostname").unwrap().vals[0]
@@ -200,7 +212,7 @@ fn main() {
             hostnames.push(hostname)
         }
         write_hosts_file(hostnames);
-        println!("SUCCESS!")
+        show_list();
     } else if let Some(m) = matches.subcommand_matches("un") {
         let hostnames = get_used_hostnames_from_hosts_file();
         let hostname = m.args.get("hostname").unwrap().vals[0].to_str().unwrap();
@@ -209,6 +221,6 @@ fn main() {
             .filter(|s| s != hostname)
             .collect::<Vec<String>>();
         write_hosts_file(v);
-        println!("SUCCESS!")
+        show_list();
     }
 }
